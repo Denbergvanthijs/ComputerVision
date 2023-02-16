@@ -42,19 +42,24 @@ def on_click(event, x, y, flags, params):
 def interpolate_points(points):
     """Interpolate the points to get the corners of the chessboard."""
     x1, y1 = points[0]  # left-top
-    x2, _ = points[1]  # right-top
-    _, y3 = points[2]  # left-bottom
-    # x4, y4 = points[3]  # right-bottom
+    x2, y2 = points[1]  # right-top
+    x3, y3 = points[2]  # left-bottom
+    x4, y4 = points[3]  # right-bottom
 
-    xs = np.linspace(x1, x2, horizontal_corners)
-    ys = np.linspace(y1, y3, vertical_corners)
-    print(xs)
-    print(ys)
+    x1x2 = np.linspace(x1, x2, horizontal_corners)  # Interpolate the x-coordinates of the top row
+    x3x4 = np.linspace(x3, x4, horizontal_corners)  # Interpolate the x-coordinates of the bottom row
+
+    y1y3 = np.linspace(y1, y3, vertical_corners)  # Interpolate the y-coordinates of the left column
+    y2y4 = np.linspace(y2, y4, vertical_corners)  # Interpolate the y-coordinates of the right column
 
     corners = np.zeros((vertical_corners, horizontal_corners, 2), dtype=np.float32)
     for v in range(vertical_corners):
         for h in range(horizontal_corners):
-            corners[v, h] = (xs[h], ys[v])
+            # Apply weighting to the x and y coordinates
+            # The closer the point is to the top or left, the more weight it gets
+            x = ((vertical_corners-v)/vertical_corners) * x1x2[h] + (v/vertical_corners) * x3x4[h]
+            y = ((horizontal_corners-h)/horizontal_corners) * y1y3[v] + (h/horizontal_corners) * y2y4[v]
+            corners[v, h] = (x, y)
 
     return corners
 
@@ -77,7 +82,7 @@ def find_chessboard_corners_cv2(img, pattern_size):
 
 
 if __name__ == "__main__":
-    fp = "./images/calib-checkerboard.png"
+    fp = "./images/training/02.jpg"
     img = cv2.imread(fp, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
