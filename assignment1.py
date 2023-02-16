@@ -34,7 +34,7 @@ def on_click(event, x, y, flags, params):
         # Draw the interpolated points
         for v in range(vertical_corners):
             for h in range(horizontal_corners):
-                cv2.circle(img, (int(corners[v, h, 0]), int(corners[v, h, 1])), 5, (0, 0, 255), -1)
+                cv2.circle(img, corners[v, h].astype(int), 5, (0, 0, 255), -1)
 
         cv2.imshow("", img)
 
@@ -54,11 +54,17 @@ def interpolate_points(points):
 
     corners = np.zeros((vertical_corners, horizontal_corners, 2), dtype=np.float32)
     for v in range(vertical_corners):
+        weight_vertical = (vertical_corners - v) / vertical_corners
+        weight_vertical_inv = 1 - weight_vertical
+
         for h in range(horizontal_corners):
             # Apply weighting to the x and y coordinates
             # The closer the point is to the top or left, the more weight it gets
-            x = ((vertical_corners-v)/vertical_corners) * x1x2[h] + (v/vertical_corners) * x3x4[h]
-            y = ((horizontal_corners-h)/horizontal_corners) * y1y3[v] + (h/horizontal_corners) * y2y4[v]
+            weight_horizontal = (horizontal_corners - h) / horizontal_corners
+            weight_horizontal_inv = 1 - weight_horizontal
+
+            x = weight_vertical * x1x2[h] + weight_vertical_inv * x3x4[h]
+            y = weight_horizontal * y1y3[v] + weight_horizontal_inv * y2y4[v]
             corners[v, h] = (x, y)
 
     return corners
@@ -82,7 +88,7 @@ def find_chessboard_corners_cv2(img, pattern_size):
 
 
 if __name__ == "__main__":
-    fp = "./images/training/02.jpg"
+    fp = "./images/training/06.jpg"
     img = cv2.imread(fp, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
