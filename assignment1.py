@@ -134,10 +134,12 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
     """
     # Termination criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    square_size = 22  # Set the size of one square in the chessboard, in milimeters
 
     # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(horizontal_corners-1,vertical_corners-1,0)
     objp = np.zeros((vertical_corners * horizontal_corners, 3), np.float32)
     objp[:, :2] = np.mgrid[0:vertical_corners, 0:horizontal_corners].T.reshape(-1, 2)
+    objp *= square_size  # Multiply by square size to get the real world coordinates, in milimeters
 
     # Arrays to store object points and image points from all the images
     objpoints = []  # 3D point in real world space
