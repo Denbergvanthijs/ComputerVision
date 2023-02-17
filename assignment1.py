@@ -215,7 +215,7 @@ def undistort_image(img, camera_params) -> tuple:
 if __name__ == "__main__":
     fp_image = "./images/test/01.jpg"
     fp_annotations = "./data/annotations.pickle"
-    fp_camera_params = "./data/camera_params.pickle"
+    fp_camera_params = "./data/camera_params_run1.pickle"
     img = cv2.imread(fp_image, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
@@ -228,7 +228,7 @@ if __name__ == "__main__":
                                          fp_annotations, fp_output=fp_camera_params)
 
         # Load the camera parameters from pickle file
-        with open("./data/camera_params.pickle", "rb") as f:
+        with open("./data/camera_params_run1.pickle", "rb") as f:
             camera_params = pickle.load(f)
 
         # Undistort an image
