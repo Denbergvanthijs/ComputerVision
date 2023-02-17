@@ -14,8 +14,12 @@ vertical_corners = 9
 font = cv2.FONT_HERSHEY_SIMPLEX
 
 
-def on_click(event, x, y, flags, params):
-    """Callback function for mouse events."""
+def on_click(event, x, y, flags, params) -> None:
+    """Callback function for mouse events.
+
+    First, collects the four corners of the chessboard provided by the user.
+    Then, interpolates the points to get the corners of the chessboard.
+    """
     if (len(points) < 4) and (event == cv2.EVENT_LBUTTONDOWN):  # If not all corners have been provided and the left mouse button is clicked
         text = f"{x=}, {y=}"
         print(text)
@@ -82,7 +86,7 @@ def interpolate_points(points):
     return corners
 
 
-def find_chessboard_corners_cv2(img, pattern_size):
+def find_chessboard_corners_cv2(img, pattern_size: tuple) -> None:
     """Find the corners of the chessboard using OpenCV.
 
     Based on https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
@@ -92,15 +96,14 @@ def find_chessboard_corners_cv2(img, pattern_size):
         print("Found chessboard corners")
         cv2.drawChessboardCorners(img, pattern_size, corners, pattern_found)
         cv2.imshow("", img)
-
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
     else:
         print("Could not find chessboard corners")
 
 
 def check_if_corners_found(fp_folder: str) -> tuple:
-    """Part of step three in assignment 1."""
+    """Checks if the chessboard corners of images in a folder can be found using OpenCV.
+
+    Part of step three in assignment 1."""
     files = os.listdir(fp_folder)
 
     found = []
@@ -125,15 +128,15 @@ if __name__ == "__main__":
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
     cv2.imshow("", img)
 
-    print(points_d[len(points)])
-    cv2.setMouseCallback("", on_click)
+    print(points_d[len(points)])  # Prints the first instruction
+    cv2.setMouseCallback("", on_click)  # Set the callback function
 
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    # FIind chessboard corners using OpenCV
+    # Find chessboard corners using OpenCV
     # find_chessboard_corners_cv2(img, (vertical_corners, horizontal_corners))
 
     # Loop over all images, check if the corners can be found using OpenCV
     # fp = "./images/corrupt/"
     # check_if_corners_found(fp)
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
