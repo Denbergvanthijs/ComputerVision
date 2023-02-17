@@ -213,7 +213,7 @@ def undistort_image(img, camera_params) -> tuple:
 
 
 if __name__ == "__main__":
-    fp_image = "./images/corrupt/05.jpg"
+    fp_image = "./images/test/01.jpg"
     fp_annotations = "./data/annotations.pickle"
     fp_camera_params = "./data/camera_params.pickle"
     img = cv2.imread(fp_image, 1)
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     calibration = True  # Set to True to calibrate the camera, False to annotate the images
     if calibration:  # Calibration mode
         # Run the calibration function
-        camera_params = calibrate_camera("./images/", horizontal_corners, vertical_corners, square_size,
+        camera_params = calibrate_camera("./images/run1/", horizontal_corners, vertical_corners, square_size,
                                          fp_annotations, fp_output=fp_camera_params)
 
         # Load the camera parameters from pickle file
