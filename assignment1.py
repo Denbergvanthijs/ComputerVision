@@ -1,5 +1,6 @@
 import glob
 import os
+import pickle
 
 import cv2
 import numpy as np
@@ -124,17 +125,23 @@ def check_if_corners_found(fp_folder: str) -> tuple:
     return found, not_found
 
 
-def calibrate(fp_folder: str, horizontal_corners: int, vertical_corners: int) -> tuple:
+def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: int, fp_output: str = None) -> dict:
+    """Calibrate the camera using OpenCV.
+
+    Uses a folder with images of a chessboard to calibrate the camera.
+
+    Based on https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
+    """
     # Termination criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-    # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+    # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(horizontal_corners-1,vertical_corners-1,0)
     objp = np.zeros((vertical_corners * horizontal_corners, 3), np.float32)
     objp[:, :2] = np.mgrid[0:vertical_corners, 0:horizontal_corners].T.reshape(-1, 2)
 
-    # Arrays to store object points and image points from all the images.
+    # Arrays to store object points and image points from all the images
     objpoints = []  # 3D point in real world space
-    imgpoints = []  # 2D points in image plane.
+    imgpoints = []  # 2D points in image plane
 
     # Go through training images and grayscale
     images = glob.glob(fp_folder + "*.jpg")
@@ -158,18 +165,55 @@ def calibrate(fp_folder: str, horizontal_corners: int, vertical_corners: int) ->
             cv2.waitKey(500)
 
     cv2.destroyAllWindows()
-    #ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+
+    # Return value, camera matrix, distortion coefficients, rotation and translation vectors
+    return_val, camera_mat, dist_coef, rot_vec, transl_vec = cv2.calibrateCamera(objpoints, imgpoints, img_grey.shape[::-1], None, None)
+
+    camera_mat_opt, roi = cv2.getOptimalNewCameraMatrix(camera_mat, dist_coef, img_grey.shape[::-1], 1, img_grey.shape[::-1])
+
+    camera_params = {"camera_mat": camera_mat, "dist_coef": dist_coef, "camera_mat_opt": camera_mat_opt, "roi": roi}
+
+    # Save the camera parameters to pickle file
+    if fp_output is not None:
+        with open(fp_output, "wb") as f:
+            pickle.dump(camera_params, f)
+
+    return camera_params
+
+
+def undistort_image(img, camera_params) -> tuple:
+    """Undistort an image using the camera matrix and distortion coefficients.
+
+    Returns the undistorted image and the cropped image.
+    """
+    # Undistort the image
+    img_undistorted = cv2.undistort(img, camera_params["camera_mat"], camera_params["dist_coef"], None, camera_params["camera_mat_opt"])
+
+    # Crop the image, only keeping the region of interest
+    x, y, w, h = camera_params["roi"]
+    img_cropped = img_undistorted[y:y + h, x:x + w]
+
+    return img_undistorted, img_cropped
 
 
 if __name__ == "__main__":
-    # fp = "./images/training/01.jpg"
-    # img = cv2.imread(fp, 1)
+    fp = "./images/training/01.jpg"
+    img = cv2.imread(fp, 1)
     # Resize image, keeping aspect ratio
-    # img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
-    # cv2.imshow("", img)
+    img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
 
     # Run the calibration function
-    calibrate("./images/training/", vertical_corners, horizontal_corners)
+    camera_params = calibrate_camera("./images/training/", horizontal_corners, vertical_corners, fp_output="./camera_params.pickle")
+
+    # Load the camera parameters from pickle file
+    with open("./camera_params.pickle", "rb") as f:
+        camera_params = pickle.load(f)
+
+    # Undistort an image
+    img_undistorted, img_cropped = undistort_image(img, camera_params)
+    cv2.imshow("Original", img)
+    cv2.imshow("Undistorted", img_undistorted)
+    cv2.imshow("Cropped", img_cropped)
 
     # print(points_d[len(points)])  # Prints the first instruction
     # cv2.setMouseCallback("", on_click)  # Set the callback function
