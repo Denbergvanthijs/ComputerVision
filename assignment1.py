@@ -1,5 +1,8 @@
+import os
+
 import cv2
 import numpy as np
+from cv2 import CALIB_CB_FAST_CHECK
 
 points = []
 points_d = {0: "Provide the left-top corner of the checkerboard",
@@ -67,6 +70,15 @@ def interpolate_points(points):
             y = weight_horizontal * y1y3[v] + weight_horizontal_inv * y2y4[v]
             corners[v, h] = (x, y)
 
+    # TODO: figure out why the interpolated points are not the same as the provided points
+    # print(corners[0, 0], corners[0, -1], corners[-1, 0], corners[-1, -1])
+    # print(points)
+
+    corners[0, 0] = points[0]
+    corners[0, -1] = points[1]
+    corners[-1, 0] = points[2]
+    corners[-1, -1] = points[3]
+
     return corners
 
 
@@ -87,8 +99,27 @@ def find_chessboard_corners_cv2(img, pattern_size):
         print("Could not find chessboard corners")
 
 
+def check_if_corners_found(fp_folder: str) -> tuple:
+    """Part of step three in assignment 1."""
+    files = os.listdir(fp_folder)
+
+    found = []
+    for file in files:
+        img = cv2.imread(fp_folder + file, 1)
+        pattern_found, _ = cv2.findChessboardCorners(img, (vertical_corners, horizontal_corners), None, CALIB_CB_FAST_CHECK)
+
+        if pattern_found:
+            found.append(file)
+            print(f"Found chessboard corners in {file}")
+        else:
+            print(f"Could not find chessboard corners in {file}")
+
+    not_found = [file for file in files if file not in found]
+    return found, not_found
+
+
 if __name__ == "__main__":
-    fp = "./images/training/06.jpg"
+    fp = "./images/corrupt/05.jpg"
     img = cv2.imread(fp, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
@@ -100,4 +131,9 @@ if __name__ == "__main__":
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
+    # FIind chessboard corners using OpenCV
     # find_chessboard_corners_cv2(img, (vertical_corners, horizontal_corners))
+
+    # Loop over all images, check if the corners can be found using OpenCV
+    # fp = "./images/corrupt/"
+    # check_if_corners_found(fp)
