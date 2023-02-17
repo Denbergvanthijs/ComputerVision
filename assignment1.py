@@ -52,7 +52,7 @@ def on_click(event, x, y, flags, param) -> None:
                 all_points = pickle.load(f)
 
         # Add new points, overwriting old annotations if they exist
-        all_points[param["fp_image"]] = corners
+        all_points[param["fp_image"].replace("\\", "/")] = corners
 
         # Save pickle dict
         with open(param["fp_output"], "wb") as f:
@@ -101,7 +101,9 @@ def interpolate_points(points, img):
     img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # Reshape corners to a 2D array
     corners = corners.reshape(-1, 1, 2)
-    corners = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
+
+    # TODO turn this function back on once we fixed the interpolation
+    # corners = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
 
     return corners
 
@@ -120,28 +122,7 @@ def find_chessboard_corners_cv2(img, pattern_size: tuple) -> None:
         print("Could not find chessboard corners")
 
 
-def check_if_corners_found(fp_folder: str) -> tuple:
-    """Checks if the chessboard corners of images in a folder can be found using OpenCV.
-
-    Part of step three in assignment 1."""
-    files = os.listdir(fp_folder)
-
-    found = []
-    for file in files:
-        img = cv2.imread(fp_folder + file, 1)
-        pattern_found, _ = cv2.findChessboardCorners(img, (vertical_corners, horizontal_corners), None, cv2.CALIB_CB_FAST_CHECK)
-
-        if pattern_found:
-            found.append(file)
-            print(f"Found chessboard corners in {file}")
-        else:
-            print(f"Could not find chessboard corners in {file}")
-
-    not_found = [file for file in files if file not in found]
-    return found, not_found
-
-
-def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: int, square_size: int, fp_output: str = None) -> dict:
+def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: int, square_size: int, fp_annotations: str, fp_output: str = None) -> dict:
     """Calibrate the camera using OpenCV.
 
     Uses a folder with images of a chessboard to calibrate the camera.
@@ -162,6 +143,7 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
     # Go through training images and grayscale
     images = glob.glob(fp_folder + "**/*.jpg", recursive=True)
     for file in images:
+        file = file.replace("\\", "/")  # Replace backslashes with forward slashes, because Windows
         img = cv2.imread(file)
         img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)  # Resize image to 20% of original size, to speed up processing
         img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -169,18 +151,31 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
         # Find the chess board corners
         pattern_found, corners = cv2.findChessboardCorners(img_grey, (vertical_corners, horizontal_corners), None)
 
+        # Load pickle with annotations
+        with open(fp_annotations, "rb") as f:
+            annotations = pickle.load(f)
+
         # If found, add image points (after refining them)
         if pattern_found:
             print(f"Found chessboard corners in {file}")
-            corners_improved = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
-            imgpoints.append(corners_improved)
-
-            # Draw and display the corners
-            cv2.drawChessboardCorners(img, (vertical_corners, horizontal_corners), corners_improved, pattern_found)
-            cv2.imshow("", img)
-            cv2.waitKey(500)
+            corners = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
         else:
             print(f"Could not find chessboard corners in {file}")
+
+            # Check if annotations are available
+            if file in annotations.keys():
+                corners = annotations[file]
+                print(f"Using annotations for {file}")
+            else:
+                print(f"Could not find annotations for {file}")
+                continue
+
+        imgpoints.append(corners)
+
+        # Draw and display the corners
+        cv2.drawChessboardCorners(img, (vertical_corners, horizontal_corners), corners, pattern_found)
+        cv2.imshow("", img)
+        cv2.waitKey(500)
 
     cv2.destroyAllWindows()
 
@@ -219,35 +214,35 @@ def undistort_image(img, camera_params) -> tuple:
 
 if __name__ == "__main__":
     fp_image = "./images/corrupt/05.jpg"
-    fp_output = "./data/annotations.pickle"
+    fp_annotations = "./data/annotations.pickle"
+    fp_camera_params = "./data/camera_params.pickle"
     img = cv2.imread(fp_image, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
     cv2.imshow("", img)
 
-    # Run the calibration function
-    # camera_params = calibrate_camera("./images/", horizontal_corners, vertical_corners, square_size,
-    #                                  fp_output="./data/camera_params.pickle")
+    calibration = True  # Set to True to calibrate the camera, False to annotate the images
+    if calibration:  # Calibration mode
+        # Run the calibration function
+        camera_params = calibrate_camera("./images/", horizontal_corners, vertical_corners, square_size,
+                                         fp_annotations, fp_output=fp_camera_params)
 
-    # Load the camera parameters from pickle file
-    # with open("./data/camera_params.pickle", "rb") as f:
-    #     camera_params = pickle.load(f)
+        # Load the camera parameters from pickle file
+        with open("./data/camera_params.pickle", "rb") as f:
+            camera_params = pickle.load(f)
 
-    # Undistort an image
-    # img_undistorted, img_cropped = undistort_image(img, camera_params)
-    # cv2.imshow("Original", img)
-    # cv2.imshow("Undistorted", img_undistorted)
-    # cv2.imshow("Cropped", img_cropped)
+        # Undistort an image
+        img_undistorted, img_cropped = undistort_image(img, camera_params)
+        cv2.imshow("Original", img)
+        cv2.imshow("Undistorted", img_undistorted)
+        cv2.imshow("Cropped", img_cropped)
 
-    print(points_d[len(points)])  # Prints the first instruction
-    cv2.setMouseCallback("", on_click, param={"fp_image": fp_image, "fp_output": fp_output})  # Set the callback function
+    else:  # Annotation mode
+        print(points_d[len(points)])  # Prints the first instruction
+        cv2.setMouseCallback("", on_click, param={"fp_image": fp_image, "fp_output": fp_annotations})  # Set the callback function
 
     # Find chessboard corners using OpenCV
     # find_chessboard_corners_cv2(img, (vertical_corners, horizontal_corners))
-
-    # Loop over all images, check if the corners can be found using OpenCV
-    # fp = "./images/corrupt/"
-    # check_if_corners_found(fp)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
