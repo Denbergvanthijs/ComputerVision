@@ -124,49 +124,52 @@ def check_if_corners_found(fp_folder: str) -> tuple:
     return found, not_found
 
 
-def calibrate():
+def calibrate(fp_folder: str, horizontal_corners: int, vertical_corners: int) -> tuple:
     # Termination criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
     # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-    objp = np.zeros((9*6, 3), np.float32)
-    objp[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)
+    objp = np.zeros((vertical_corners * horizontal_corners, 3), np.float32)
+    objp[:, :2] = np.mgrid[0:vertical_corners, 0:horizontal_corners].T.reshape(-1, 2)
 
     # Arrays to store object points and image points from all the images.
     objpoints = []  # 3D point in real world space
     imgpoints = []  # 2D points in image plane.
-    images = glob.glob("./images/training/*.jpg")
 
     # Go through training images and grayscale
+    images = glob.glob(fp_folder + "*.jpg")
     for file in images:
         img = cv2.imread(file)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)  # Resize image to 20% of original size, to speed up processing
+        img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         # Find the chess board corners
-        ret, corners = cv2.findChessboardCorners(gray, (9, 6), None)
+        pattern_found, corners = cv2.findChessboardCorners(img_grey, (vertical_corners, horizontal_corners), None)
 
         # If found, add object points, image points (after refining them)
-        if ret == True:
+        if pattern_found == True:
             objpoints.append(objp)
-            corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-            imgpoints.append(corners2)
+            corners_improved = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
+            imgpoints.append(corners_improved)
+
             # Draw and display the corners
-            cv2.drawChessboardCorners(img, (7, 6), corners2, ret)
-            cv2.imshow('img', img)
+            cv2.drawChessboardCorners(img, (vertical_corners, horizontal_corners), corners_improved, pattern_found)
+            cv2.imshow("", img)
             cv2.waitKey(500)
+
     cv2.destroyAllWindows()
     #ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
 
 
 if __name__ == "__main__":
-    fp = "./images/training/01.jpg"
-    img = cv2.imread(fp, 1)
+    # fp = "./images/training/01.jpg"
+    # img = cv2.imread(fp, 1)
     # Resize image, keeping aspect ratio
-    img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
-    cv2.imshow("", img)
+    # img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
+    # cv2.imshow("", img)
 
     # Run the calibration function
-    calibrate()
+    calibrate("./images/training/", vertical_corners, horizontal_corners)
 
     # print(points_d[len(points)])  # Prints the first instruction
     # cv2.setMouseCallback("", on_click)  # Set the callback function
