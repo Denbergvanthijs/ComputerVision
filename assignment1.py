@@ -1,5 +1,5 @@
 import os
-
+import glob
 import cv2
 import numpy as np
 from cv2 import CALIB_CB_FAST_CHECK
@@ -14,9 +14,10 @@ vertical_corners = 9
 font = cv2.FONT_HERSHEY_SIMPLEX
 
 
+# on_click asks user to provide 4 the four cornerpoints of the chessboard
 def on_click(event, x, y, flags, params):
-    """Callback function for mouse events."""
-    if (len(points) < 4) and (event == cv2.EVENT_LBUTTONDOWN):  # If not all corners have been provided and the left mouse button is clicked
+    # Check if not all corners have been provided and the left mouse button is clicked
+    if (len(points) < 4) and (event == cv2.EVENT_LBUTTONDOWN):  
         text = f"{x=}, {y=}"
         print(text)
 
@@ -26,10 +27,11 @@ def on_click(event, x, y, flags, params):
         points.append((x, y))
         print(points)
 
-        if len(points) < 4:  # If not all corners have been provided
+        if len(points) < 4:
             print(points_d[len(points)])
 
-    if (len(points) == 4) and (event == cv2.EVENT_LBUTTONDOWN):  # If all corners have been provided
+    # After the 4th cornerpoint ...
+    if (len(points) == 4) and (event == cv2.EVENT_LBUTTONDOWN):
         print("All corners have been provided!")
 
         corners = interpolate_points(points)
@@ -56,6 +58,7 @@ def interpolate_points(points):
     y2y4 = np.linspace(y2, y4, vertical_corners)  # Interpolate the y-coordinates of the right column
 
     corners = np.zeros((vertical_corners, horizontal_corners, 2), dtype=np.float32)
+    
     for v in range(vertical_corners):
         weight_vertical = (vertical_corners - v) / vertical_corners
         weight_vertical_inv = 1 - weight_vertical
@@ -117,22 +120,58 @@ def check_if_corners_found(fp_folder: str) -> tuple:
     not_found = [file for file in files if file not in found]
     return found, not_found
 
+def calibrate():
+    # Termination criteria
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) 
+
+    # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+    objp = np.zeros((9*6,3), np.float32)
+    objp[:,:2] = np.mgrid[0:9,0:6].T.reshape(-1,2)
+
+    # Arrays to store object points and image points from all the images.
+    objpoints = [] # 3D point in real world space
+    imgpoints = [] # 2D points in image plane.
+    images = glob.glob("./images/training/*.jpg")
+
+    # Go through training images and grayscale
+    for file in images:
+        img = cv2.imread(file)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Find the chess board corners
+        ret, corners = cv2.findChessboardCorners(gray, (9,6), None)
+
+            # If found, add object points, image points (after refining them)
+        if ret == True:
+            objpoints.append(objp)
+            corners2 = cv2.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
+            imgpoints.append(corners2)
+            # Draw and display the corners
+            cv2.drawChessboardCorners(img, (7,6), corners2, ret)
+            cv2.imshow('img', img)
+            cv2.waitKey(500)
+    cv2.destroyAllWindows()
+    #ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+
 
 if __name__ == "__main__":
-    fp = "./images/corrupt/05.jpg"
+    fp = "./images/training/01.jpg"
     img = cv2.imread(fp, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
     cv2.imshow("", img)
 
-    print(points_d[len(points)])
-    cv2.setMouseCallback("", on_click)
+    # Run the calibration function
+    calibrate()
 
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    #print(points_d[len(points)])
+    #cv2.setMouseCallback("", on_click)
 
-    # FIind chessboard corners using OpenCV
-    # find_chessboard_corners_cv2(img, (vertical_corners, horizontal_corners))
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
+
+    # Find chessboard corners using OpenCV
+    #find_chessboard_corners_cv2(img, (vertical_corners, horizontal_corners))
 
     # Loop over all images, check if the corners can be found using OpenCV
     # fp = "./images/corrupt/"
