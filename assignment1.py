@@ -4,15 +4,17 @@ import pickle
 
 import cv2
 import numpy as np
-from cv2 import CALIB_CB_FAST_CHECK
 
 points = []
 points_d = {0: "Provide the left-top corner of the checkerboard",
             1: "Provide the right-top corner of the checkerboard",
             2: "Provide the left-bottom corner of the checkerboard",
             3: "Provide the right-bottom corner of the checkerboard"}
-horizontal_corners = 6
-vertical_corners = 9
+
+horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
+vertical_corners = 9  # Set the number of vertical corners of the chessboard
+square_size = 22  # Set the size of one square in the chessboard, in milimeters
+
 font = cv2.FONT_HERSHEY_SIMPLEX
 
 
@@ -113,7 +115,7 @@ def check_if_corners_found(fp_folder: str) -> tuple:
     found = []
     for file in files:
         img = cv2.imread(fp_folder + file, 1)
-        pattern_found, _ = cv2.findChessboardCorners(img, (vertical_corners, horizontal_corners), None, CALIB_CB_FAST_CHECK)
+        pattern_found, _ = cv2.findChessboardCorners(img, (vertical_corners, horizontal_corners), None, cv2.CALIB_CB_FAST_CHECK)
 
         if pattern_found:
             found.append(file)
@@ -125,7 +127,7 @@ def check_if_corners_found(fp_folder: str) -> tuple:
     return found, not_found
 
 
-def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: int, fp_output: str = None) -> dict:
+def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: int, square_size: int, fp_output: str = None) -> dict:
     """Calibrate the camera using OpenCV.
 
     Uses a folder with images of a chessboard to calibrate the camera.
@@ -134,15 +136,13 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
     """
     # Termination criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    square_size = 22  # Set the size of one square in the chessboard, in milimeters
 
     # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(horizontal_corners-1,vertical_corners-1,0)
     objp = np.zeros((vertical_corners * horizontal_corners, 3), np.float32)
     objp[:, :2] = np.mgrid[0:vertical_corners, 0:horizontal_corners].T.reshape(-1, 2)
     objp *= square_size  # Multiply by square size to get the real world coordinates, in milimeters
 
-    # Arrays to store object points and image points from all the images
-    objpoints = []  # 3D point in real world space
+    # Array to store image points from all the images
     imgpoints = []  # 2D points in image plane
 
     # Go through training images and grayscale
@@ -155,9 +155,8 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
         # Find the chess board corners
         pattern_found, corners = cv2.findChessboardCorners(img_grey, (vertical_corners, horizontal_corners), None)
 
-        # If found, add object points, image points (after refining them)
+        # If found, add image points (after refining them)
         if pattern_found == True:
-            objpoints.append(objp)
             corners_improved = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
             imgpoints.append(corners_improved)
 
@@ -167,6 +166,9 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
             cv2.waitKey(500)
 
     cv2.destroyAllWindows()
+
+    # Since all images are taken with the same camera, the object points are the same
+    objpoints = len(imgpoints) * [objp]  # 3D point in real world space
 
     # Return value, camera matrix, distortion coefficients, rotation and translation vectors
     return_val, camera_mat, dist_coef, rot_vec, transl_vec = cv2.calibrateCamera(objpoints, imgpoints, img_grey.shape[::-1], None, None)
@@ -205,7 +207,8 @@ if __name__ == "__main__":
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
 
     # Run the calibration function
-    camera_params = calibrate_camera("./images/training/", horizontal_corners, vertical_corners, fp_output="./camera_params.pickle")
+    camera_params = calibrate_camera("./images/training/", horizontal_corners, vertical_corners, square_size,
+                                     fp_output="./camera_params.pickle")
 
     # Load the camera parameters from pickle file
     with open("./camera_params.pickle", "rb") as f:
