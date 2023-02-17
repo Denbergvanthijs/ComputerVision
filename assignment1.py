@@ -16,9 +16,10 @@ vertical_corners = 9  # Set the number of vertical corners of the chessboard
 square_size = 22  # Set the size of one square in the chessboard, in milimeters
 
 font = cv2.FONT_HERSHEY_SIMPLEX
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
 
-def on_click(event, x, y, flags, params) -> None:
+def on_click(event, x, y, flags, param) -> None:
     """Callback function for mouse events.
 
     First, collects the four corners of the chessboard provided by the user.
@@ -41,17 +42,30 @@ def on_click(event, x, y, flags, params) -> None:
     if (len(points) == 4) and (event == cv2.EVENT_LBUTTONDOWN):
         print("All corners have been provided!")
 
-        corners = interpolate_points(points)
+        corners = interpolate_points(points, img)
+
+        # Check if pickle file exists, to save annotations
+        if not os.path.exists(param["fp_output"]):
+            all_points = {}
+        else:
+            with open(param["fp_output"], "rb") as f:
+                all_points = pickle.load(f)
+
+        # Add new points, overwriting old annotations if they exist
+        all_points[param["fp_image"]] = corners
+
+        # Save pickle dict
+        with open(param["fp_output"], "wb") as f:
+            pickle.dump(all_points, f)
 
         # Draw the interpolated points
-        for v in range(vertical_corners):
-            for h in range(horizontal_corners):
-                cv2.circle(img, corners[v, h].astype(int), 5, (0, 0, 255), -1)
+        for corner in corners:
+            cv2.circle(img, corner[0].astype(int), 5, (0, 0, 255), -1)
 
         cv2.imshow("", img)
 
 
-def interpolate_points(points):
+def interpolate_points(points, img):
     """Interpolate the points to get the corners of the chessboard."""
     x1, y1 = points[0]  # left-top
     x2, y2 = points[1]  # right-top
@@ -84,10 +98,10 @@ def interpolate_points(points):
     # print(corners[0, 0], corners[0, -1], corners[-1, 0], corners[-1, -1])
     # print(points)
 
-    corners[0, 0] = points[0]
-    corners[0, -1] = points[1]
-    corners[-1, 0] = points[2]
-    corners[-1, -1] = points[3]
+    img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Reshape corners to a 2D array
+    corners = corners.reshape(-1, 1, 2)
+    corners = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
 
     return corners
 
@@ -146,7 +160,7 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
     imgpoints = []  # 2D points in image plane
 
     # Go through training images and grayscale
-    images = glob.glob(fp_folder + "*.jpg")
+    images = glob.glob(fp_folder + "**/*.jpg", recursive=True)
     for file in images:
         img = cv2.imread(file)
         img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)  # Resize image to 20% of original size, to speed up processing
@@ -156,7 +170,8 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
         pattern_found, corners = cv2.findChessboardCorners(img_grey, (vertical_corners, horizontal_corners), None)
 
         # If found, add image points (after refining them)
-        if pattern_found == True:
+        if pattern_found:
+            print(f"Found chessboard corners in {file}")
             corners_improved = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
             imgpoints.append(corners_improved)
 
@@ -164,6 +179,8 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
             cv2.drawChessboardCorners(img, (vertical_corners, horizontal_corners), corners_improved, pattern_found)
             cv2.imshow("", img)
             cv2.waitKey(500)
+        else:
+            print(f"Could not find chessboard corners in {file}")
 
     cv2.destroyAllWindows()
 
@@ -201,27 +218,29 @@ def undistort_image(img, camera_params) -> tuple:
 
 
 if __name__ == "__main__":
-    fp = "./images/training/01.jpg"
-    img = cv2.imread(fp, 1)
+    fp_image = "./images/corrupt/05.jpg"
+    fp_output = "./data/annotations.pickle"
+    img = cv2.imread(fp_image, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
+    cv2.imshow("", img)
 
     # Run the calibration function
-    camera_params = calibrate_camera("./images/training/", horizontal_corners, vertical_corners, square_size,
-                                     fp_output="./camera_params.pickle")
+    # camera_params = calibrate_camera("./images/", horizontal_corners, vertical_corners, square_size,
+    #                                  fp_output="./data/camera_params.pickle")
 
     # Load the camera parameters from pickle file
-    with open("./camera_params.pickle", "rb") as f:
-        camera_params = pickle.load(f)
+    # with open("./data/camera_params.pickle", "rb") as f:
+    #     camera_params = pickle.load(f)
 
     # Undistort an image
-    img_undistorted, img_cropped = undistort_image(img, camera_params)
-    cv2.imshow("Original", img)
-    cv2.imshow("Undistorted", img_undistorted)
-    cv2.imshow("Cropped", img_cropped)
+    # img_undistorted, img_cropped = undistort_image(img, camera_params)
+    # cv2.imshow("Original", img)
+    # cv2.imshow("Undistorted", img_undistorted)
+    # cv2.imshow("Cropped", img_cropped)
 
-    # print(points_d[len(points)])  # Prints the first instruction
-    # cv2.setMouseCallback("", on_click)  # Set the callback function
+    print(points_d[len(points)])  # Prints the first instruction
+    cv2.setMouseCallback("", on_click, param={"fp_image": fp_image, "fp_output": fp_output})  # Set the callback function
 
     # Find chessboard corners using OpenCV
     # find_chessboard_corners_cv2(img, (vertical_corners, horizontal_corners))
