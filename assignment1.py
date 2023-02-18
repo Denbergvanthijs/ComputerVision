@@ -1,22 +1,10 @@
 import glob
+import json
 import os
 import pickle
 
 import cv2
 import numpy as np
-
-points = []
-points_d = {0: "Provide the left-top corner of the checkerboard",
-            1: "Provide the right-top corner of the checkerboard",
-            2: "Provide the left-bottom corner of the checkerboard",
-            3: "Provide the right-bottom corner of the checkerboard"}
-
-horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
-vertical_corners = 9  # Set the number of vertical corners of the chessboard
-square_size = 22  # Set the size of one square in the chessboard, in milimeters
-
-font = cv2.FONT_HERSHEY_SIMPLEX
-criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
 
 def on_click(event, x, y, flags, param) -> None:
@@ -122,6 +110,18 @@ def find_chessboard_corners_cv2(img, pattern_size: tuple) -> None:
         print("Could not find chessboard corners")
 
 
+def make_object_points(horizontal_corners: int, vertical_corners: int, square_size: int) -> np.ndarray:
+    """Make the object points for the chessboard.q
+
+    The object points are the 3D points in real world space.
+    """
+    # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(horizontal_corners-1,vertical_corners-1,0)
+    objp = np.zeros((vertical_corners * horizontal_corners, 3), np.float32)
+    objp[:, :2] = np.mgrid[0:vertical_corners, 0:horizontal_corners].T.reshape(-1, 2)
+    objp *= square_size  # Multiply by square size to get the real world coordinates, in milimeters
+    return objp
+
+
 def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: int, square_size: int, fp_annotations: str, fp_output: str = None) -> dict:
     """Calibrate the camera using OpenCV.
 
@@ -132,10 +132,7 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
     # Termination criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-    # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(horizontal_corners-1,vertical_corners-1,0)
-    objp = np.zeros((vertical_corners * horizontal_corners, 3), np.float32)
-    objp[:, :2] = np.mgrid[0:vertical_corners, 0:horizontal_corners].T.reshape(-1, 2)
-    objp *= square_size  # Multiply by square size to get the real world coordinates, in milimeters
+    objp = make_object_points(horizontal_corners, vertical_corners, square_size)  # 3D points in real world space
 
     # Array to store image points from all the images
     imgpoints = []  # 2D points in image plane
@@ -187,6 +184,19 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
 
     camera_mat_opt, roi = cv2.getOptimalNewCameraMatrix(camera_mat, dist_coef, img_grey.shape[::-1], 1, img_grey.shape[::-1])
 
+    mean_error = []  # Based on https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
+    for i in range(len(objpoints)):
+        imgpoints_projected, _ = cv2.projectPoints(objpoints[i], rot_vec[i], transl_vec[i], camera_mat, dist_coef)
+        error = cv2.norm(imgpoints[i], imgpoints_projected, cv2.NORM_L2) / len(imgpoints_projected)
+        mean_error.append(error)
+
+    stats = {}
+    stats["total_images"] = len(objpoints)
+    stats["mean_error"] = sum(mean_error) / len(objpoints)
+    stats["individual_errors"] = mean_error
+
+    print(f"The mean error is {stats['mean_error']}")
+
     camera_params = {"camera_mat": camera_mat, "dist_coef": dist_coef, "camera_mat_opt": camera_mat_opt, "roi": roi}
 
     # Save the camera parameters to pickle file
@@ -194,7 +204,7 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
         with open(fp_output, "wb") as f:
             pickle.dump(camera_params, f)
 
-    return camera_params
+    return camera_params, stats
 
 
 def undistort_image(img, camera_params) -> tuple:
@@ -213,9 +223,24 @@ def undistort_image(img, camera_params) -> tuple:
 
 
 if __name__ == "__main__":
+    points = []
+    points_d = {0: "Provide the left-top corner of the checkerboard",
+                1: "Provide the right-top corner of the checkerboard",
+                2: "Provide the left-bottom corner of the checkerboard",
+                3: "Provide the right-bottom corner of the checkerboard"}
+
+    horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
+    vertical_corners = 9  # Set the number of vertical corners of the chessboard
+    square_size = 22  # Set the size of one square in the chessboard, in milimeters
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+
     fp_image = "./images/test/01.jpg"
     fp_annotations = "./data/annotations.pickle"
-    fp_camera_params = "./data/camera_params_run1.pickle"
+    fp_camera_params = "./data/camera_params_run2.pickle"
+    fp_stats = "./data/stats_run2.json"
+    fp_input_images = "./images/run2/"
     img = cv2.imread(fp_image, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
@@ -224,12 +249,16 @@ if __name__ == "__main__":
     calibration = True  # Set to True to calibrate the camera, False to annotate the images
     if calibration:  # Calibration mode
         # Run the calibration function
-        camera_params = calibrate_camera("./images/run1/", horizontal_corners, vertical_corners, square_size,
-                                         fp_annotations, fp_output=fp_camera_params)
+        camera_params, stats = calibrate_camera(fp_input_images, horizontal_corners, vertical_corners, square_size,
+                                                fp_annotations, fp_output=fp_camera_params)
 
         # Load the camera parameters from pickle file
-        with open("./data/camera_params_run1.pickle", "rb") as f:
+        with open(fp_camera_params, "rb") as f:
             camera_params = pickle.load(f)
+
+        # Save stats as json file
+        with open(fp_stats, "w") as f:
+            json.dump(stats, f, indent=4)
 
         # Undistort an image
         img_undistorted, img_cropped = undistort_image(img, camera_params)
