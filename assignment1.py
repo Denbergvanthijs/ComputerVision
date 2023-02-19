@@ -90,8 +90,8 @@ def interpolate_points(points, img):
     corners = corners.reshape(-1, 1, 2)
 
     # TODO turn this function back on once we fixed the interpolation
-    # img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # corners = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
+    img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    corners = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
 
     return corners
 
