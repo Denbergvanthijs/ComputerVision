@@ -10,20 +10,20 @@ def draw(img, corners, imagepoints):
     Based on https://docs.opencv.org/4.6.0/d7/d53/tutorial_py_pose.html
     """
     corners = corners.astype(int)
-    corner = tuple(corners[0].ravel().astype(int))
-    imagepoints = imagepoints.astype(int)
+    origin = corners[0].reshape(2)  # Flattening the array
+    imagepoints = imagepoints.astype(int).reshape(3, 2)
 
-    img = cv2.line(img, corner, tuple(imagepoints[0].ravel()), (255, 0, 0), 5)
-    img = cv2.line(img, corner, tuple(imagepoints[1].ravel()), (0, 255, 0), 5)
-    img = cv2.line(img, corner, tuple(imagepoints[2].ravel()), (0, 0, 255), 5)
+    img = cv2.line(img, origin, imagepoints[0], (255, 0, 0), 5)
+    img = cv2.line(img, origin, imagepoints[1], (0, 255, 0), 5)
+    img = cv2.line(img, origin, imagepoints[2], (0, 0, 255), 5)
     return img
 
 
 if __name__ == "__main__":
     # Set the file paths
-    fp_input_image = "./images/test/01.jpg"
-    fp_output = "./images/image_run1.png"
-    fp_params = "./data/camera_params_run1.pickle"
+    fp_input_image = "./images/test/01.jpg"  # Set the path to the test image
+    fp_output = "./images/image_run1.png"  # Set the path to save the test image, with axis
+    fp_params = "./data/camera_params_run1.pickle"  # Set the path to load the camera parameters
 
     # Additional parameters
     horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
