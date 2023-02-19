@@ -220,16 +220,16 @@ def undistort_image(img, camera_params) -> tuple:
 
 
 if __name__ == "__main__":
-    calibration = False  # Set to True to calibrate the camera, False to annotate the images
+    calibration = True  # Set to True to calibrate the camera, False to annotate the images
 
     # Annotation mode
-    fp_image = "./images/run1/corrupt/05.jpg"  # Set the path to the image to be annotated
+    fp_image = "./images/test/01.jpg"  # Set the path to the image to be annotated
     fp_annotations = "./data/annotations.pickle"  # Set the path to save the annotations
 
     # Calibration mode
-    fp_input_images = "./images/new/"  # Set the path to the folder with the images to be used for calibration
-    fp_camera_params = "./data/camera_params_new.pickle"  # Set the path to save the camera parameters
-    fp_stats = "./data/stats_new.json"  # Set the path to save the stats of the calibration
+    fp_input_images = "./images/run1/"  # Set the path to the folder with the images to be used for calibration
+    fp_camera_params = "./data/camera_params_run1.pickle"  # Set the path to save the camera parameters
+    fp_stats = "./data/stats_run1.json"  # Set the path to save the stats of the calibration
 
     # Additional parameters
     horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
