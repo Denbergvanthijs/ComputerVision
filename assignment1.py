@@ -66,48 +66,35 @@ def interpolate_points(points, img):
     y1y3 = np.linspace(y1, y3, vertical_corners)  # Interpolate the y-coordinates of the left column
     y2y4 = np.linspace(y2, y4, vertical_corners)  # Interpolate the y-coordinates of the right column
 
-    corners = np.zeros((vertical_corners, horizontal_corners, 2), dtype=np.float32)
+    corners = np.zeros((vertical_corners, horizontal_corners, 2), dtype=np.float32)  # 2D array of all corners
 
     for v in range(vertical_corners):
-        weight_vertical = (vertical_corners - v) / vertical_corners
-        weight_vertical_inv = 1 - weight_vertical
+        weight_vertical_inv = v / (vertical_corners - 1)  # From 0 to 1 (minus 1 because we start at 0)
+        weight_vertical = 1 - weight_vertical_inv  # From 1 to 0
 
         for h in range(horizontal_corners):
             # Apply weighting to the x and y coordinates
             # The closer the point is to the top or left, the more weight it gets
-            weight_horizontal = (horizontal_corners - h) / horizontal_corners
-            weight_horizontal_inv = 1 - weight_horizontal
+
+            weight_horizontal_inv = h / (horizontal_corners - 1)  # From 0 to 1 (minus 1 because we start at 0)
+            weight_horizontal = 1 - weight_horizontal_inv  # From 1 to 0
 
             x = weight_vertical * x1x2[h] + weight_vertical_inv * x3x4[h]
             y = weight_horizontal * y1y3[v] + weight_horizontal_inv * y2y4[v]
             corners[v, h] = (x, y)
 
-    # TODO: figure out why the interpolated points are not the same as the provided points
-    # print(corners[0, 0], corners[0, -1], corners[-1, 0], corners[-1, -1])
-    # print(points)
+    # Check if estimated corners are the same as the provided corners
+    est_corners = np.array([corners[0, 0], corners[0, -1], corners[-1, 0], corners[-1, -1]])
+    assert np.array_equal(np.array(points), est_corners), "The four corners are not the same!"
 
-    img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # Reshape corners to a 2D array
     corners = corners.reshape(-1, 1, 2)
 
     # TODO turn this function back on once we fixed the interpolation
+    # img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # corners = cv2.cornerSubPix(img_grey, corners, (11, 11), (-1, -1), criteria)
 
     return corners
-
-
-def find_chessboard_corners_cv2(img, pattern_size: tuple) -> None:
-    """Find the corners of the chessboard using OpenCV.
-
-    Based on https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
-    """
-    pattern_found, corners = cv2.findChessboardCorners(img, pattern_size)
-    if pattern_found:
-        print("Found chessboard corners")
-        cv2.drawChessboardCorners(img, pattern_size, corners, pattern_found)
-        cv2.imshow("", img)
-    else:
-        print("Could not find chessboard corners")
 
 
 def make_object_points(horizontal_corners: int, vertical_corners: int, square_size: int) -> np.ndarray:
@@ -223,30 +210,36 @@ def undistort_image(img, camera_params) -> tuple:
 
 
 if __name__ == "__main__":
+    calibration = False  # Set to True to calibrate the camera, False to annotate the images
+
+    # Annotation mode
+    fp_image = "./images/run1/corrupt/05.jpg"  # Set the path to the image to be annotated
+    fp_annotations = "./data/annotations.pickle"  # Set the path to save the annotations
+
+    # Calibration mode
+    fp_camera_params = "./data/camera_params_run3.pickle"  # Set the path to save the camera parameters
+    fp_stats = "./data/stats_run3.json"  # Set the path to save the stats of the calibration
+    fp_input_images = "./images/run3/"  # Set the path to the folder with the images to be used for calibration
+
+    # Additional parameters
+    horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
+    vertical_corners = 9  # Set the number of vertical corners of the chessboard
+    square_size = 22  # Set the size of one square in the chessboard, in milimeters
+
     points = []
     points_d = {0: "Provide the left-top corner of the checkerboard",
                 1: "Provide the right-top corner of the checkerboard",
                 2: "Provide the left-bottom corner of the checkerboard",
                 3: "Provide the right-bottom corner of the checkerboard"}
 
-    horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
-    vertical_corners = 9  # Set the number of vertical corners of the chessboard
-    square_size = 22  # Set the size of one square in the chessboard, in milimeters
-
     font = cv2.FONT_HERSHEY_SIMPLEX
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-    fp_image = "./images/test/01.jpg"
-    fp_annotations = "./data/annotations.pickle"
-    fp_camera_params = "./data/camera_params_run2.pickle"
-    fp_stats = "./data/stats_run2.json"
-    fp_input_images = "./images/run2/"
     img = cv2.imread(fp_image, 1)
     # Resize image, keeping aspect ratio
     img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
     cv2.imshow("", img)
 
-    calibration = True  # Set to True to calibrate the camera, False to annotate the images
     if calibration:  # Calibration mode
         # Run the calibration function
         camera_params, stats = calibrate_camera(fp_input_images, horizontal_corners, vertical_corners, square_size,
@@ -269,9 +262,6 @@ if __name__ == "__main__":
     else:  # Annotation mode
         print(points_d[len(points)])  # Prints the first instruction
         cv2.setMouseCallback("", on_click, param={"fp_image": fp_image, "fp_output": fp_annotations})  # Set the callback function
-
-    # Find chessboard corners using OpenCV
-    # find_chessboard_corners_cv2(img, (vertical_corners, horizontal_corners))
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
