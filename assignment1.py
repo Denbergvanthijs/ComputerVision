@@ -109,6 +109,30 @@ def make_object_points(horizontal_corners: int, vertical_corners: int, square_si
     return objp
 
 
+def calculate_calibration_stats(camera_params: dict, norm: int = cv2.NORM_L2) -> dict:
+    """Calculate the calibration statistics.
+
+    Based on https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
+    """
+    objectpoints = camera_params["object_points"]
+    imagepoints = camera_params["image_points"]
+
+    camera_mat = camera_params["camera_matrix"]
+    dist_coef = camera_params["distortion_coefficients"]
+    rot_vec = camera_params["rotation_vectors"]
+    transl_vec = camera_params["translation_vectors"]
+
+    errors = []
+    for image in range(len(objectpoints)):
+        imagepoints_proj, _ = cv2.projectPoints(objectpoints[image], rot_vec[image], transl_vec[image], camera_mat, dist_coef)
+        error = cv2.norm(imagepoints[image], imagepoints_proj, norm) / len(imagepoints_proj)
+        errors.append(error)
+
+    return {"total_images": len(objectpoints),
+            "mean_error": sum(errors) / len(objectpoints),
+            "individual_errors": errors}
+
+
 def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: int, square_size: int, fp_annotations: str, fp_output: str = None) -> dict:
     """Calibrate the camera using OpenCV.
 
@@ -116,9 +140,6 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
 
     Based on https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
     """
-    # Termination criteria
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-
     objp = make_object_points(horizontal_corners, vertical_corners, square_size)  # 3D points in real world space
 
     # Array to store image points from all the images
@@ -171,27 +192,16 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
 
     camera_mat_opt, roi = cv2.getOptimalNewCameraMatrix(camera_mat, dist_coef, img_grey.shape[::-1], 1, img_grey.shape[::-1])
 
-    mean_error = []  # Based on https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
-    for i in range(len(objpoints)):
-        imgpoints_projected, _ = cv2.projectPoints(objpoints[i], rot_vec[i], transl_vec[i], camera_mat, dist_coef)
-        error = cv2.norm(imgpoints[i], imgpoints_projected, cv2.NORM_L2) / len(imgpoints_projected)
-        mean_error.append(error)
-
-    stats = {}
-    stats["total_images"] = len(objpoints)
-    stats["mean_error"] = sum(mean_error) / len(objpoints)
-    stats["individual_errors"] = mean_error
-
-    print(f"The mean error is {stats['mean_error']}")
-
-    camera_params = {"camera_mat": camera_mat, "dist_coef": dist_coef, "camera_mat_opt": camera_mat_opt, "roi": roi}
+    # Also save the object points and image points to calculate the calibration statistics
+    camera_params = {"camera_matrix": camera_mat, "distortion_coefficients": dist_coef, "camera_matrix_optimal": camera_mat_opt, "roi": roi,
+                     "rotation_vectors": rot_vec, "translation_vectors": transl_vec, "object_points": objpoints, "image_points": imgpoints}
 
     # Save the camera parameters to pickle file
     if fp_output is not None:
         with open(fp_output, "wb") as f:
             pickle.dump(camera_params, f)
 
-    return camera_params, stats
+    return camera_params
 
 
 def undistort_image(img, camera_params) -> tuple:
@@ -200,7 +210,8 @@ def undistort_image(img, camera_params) -> tuple:
     Returns the undistorted image and the cropped image.
     """
     # Undistort the image
-    img_undistorted = cv2.undistort(img, camera_params["camera_mat"], camera_params["dist_coef"], None, camera_params["camera_mat_opt"])
+    img_undistorted = cv2.undistort(img, camera_params["camera_matrix"], camera_params["distortion_coefficients"],
+                                    None, camera_params["camera_matrix_optimal"])
 
     # Crop the image, only keeping the region of interest
     x, y, w, h = camera_params["roi"]
@@ -210,16 +221,16 @@ def undistort_image(img, camera_params) -> tuple:
 
 
 if __name__ == "__main__":
-    calibration = False  # Set to True to calibrate the camera, False to annotate the images
+    calibration = True  # Set to True to calibrate the camera, False to annotate the images
 
     # Annotation mode
     fp_image = "./images/run1/corrupt/05.jpg"  # Set the path to the image to be annotated
     fp_annotations = "./data/annotations.pickle"  # Set the path to save the annotations
 
     # Calibration mode
-    fp_camera_params = "./data/camera_params_run3.pickle"  # Set the path to save the camera parameters
-    fp_stats = "./data/stats_run3.json"  # Set the path to save the stats of the calibration
-    fp_input_images = "./images/run3/"  # Set the path to the folder with the images to be used for calibration
+    fp_input_images = "./images/run1/"  # Set the path to the folder with the images to be used for calibration
+    fp_camera_params = "./data/camera_params_run1.pickle"  # Set the path to save the camera parameters
+    fp_stats = "./data/stats_run1.json"  # Set the path to save the stats of the calibration
 
     # Additional parameters
     horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
@@ -242,8 +253,10 @@ if __name__ == "__main__":
 
     if calibration:  # Calibration mode
         # Run the calibration function
-        camera_params, stats = calibrate_camera(fp_input_images, horizontal_corners, vertical_corners, square_size,
-                                                fp_annotations, fp_output=fp_camera_params)
+        camera_params = calibrate_camera(fp_input_images, horizontal_corners, vertical_corners, square_size,
+                                         fp_annotations, fp_output=fp_camera_params)
+        stats = calculate_calibration_stats(camera_params)
+        print(f"The mean error is {stats['mean_error']}")
 
         # Load the camera parameters from pickle file
         with open(fp_camera_params, "rb") as f:

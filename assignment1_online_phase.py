@@ -20,10 +20,12 @@ def draw(img, corners, imagepoints):
 
 
 if __name__ == "__main__":
-    fp_params = "./data/camera_params_run2.pickle"
+    # Set the file paths
     fp_input_image = "./images/test/01.jpg"
-    fp_output = "./images/image_run2.png"
+    fp_output = "./images/image_run1.png"
+    fp_params = "./data/camera_params_run1.pickle"
 
+    # Additional parameters
     horizontal_corners = 6  # Set the number of horizontal corners of the chessboard
     vertical_corners = 9  # Set the number of vertical corners of the chessboard
     square_size = 22  # Set the size of the squares in mm
@@ -35,8 +37,8 @@ if __name__ == "__main__":
     with open(fp_params, "rb") as f:
         camera_params = pickle.load(f)
 
-    camera_mat = camera_params["camera_mat"]
-    dist_coef = camera_params["dist_coef"]
+    camera_mat = camera_params["camera_matrix"]
+    dist_coef = camera_params["distortion_coefficients"]
 
     # Load test image with openCV
     print(f"Loading test image: {fp_input_image}")
