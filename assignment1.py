@@ -21,7 +21,6 @@ def on_click(event, x, y, flags, param) -> None:
         cv2.imshow("", img)
 
         points.append((x, y))
-        print(points)
 
         if len(points) < 4:
             print(points_d[len(points)])
