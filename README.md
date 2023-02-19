@@ -6,6 +6,8 @@ The offline phase of assignment 1 can be found in `./assignment1.py`. Both the a
 
 The online phase of assignment 1 can be found in `./assignment1_online_phase.py`. The undistorted images can be found in the folder `./images/cropped/`. The images with the axis and a cube drawn on them can be found in the folder `./images/cube/`.
 
+To make a video and draw a cube in it, run the `assignment1_video.py` script.
+
 ![Result Run 1](images/cube/image_run1.png)
 ![Result Run 2](images/cube/image_run2.png)
 ![Result Run 3](images/cube/image_run3.png)
