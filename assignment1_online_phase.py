@@ -28,11 +28,11 @@ def draw(img, corners, imagepoints):
     img = cv2.line(img, origin, imagepoints[4], (0, 0, 255), 10)  # Draw z axis in red
 
     # Draw big circle at origin
-    img = cv2.circle(img, tuple(origin), 15, colour, -1)
+    img = cv2.circle(img, origin, 15, colour, -1)
 
     # Draw black circles at imagepoints
     for start in imagepoints:
-        img = cv2.circle(img, tuple(start), 5, (0, 0, 0), -1)
+        img = cv2.circle(img, start, 5, (0, 0, 0), -1)
 
     return img
 
