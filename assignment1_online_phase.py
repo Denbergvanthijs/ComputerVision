@@ -11,18 +11,36 @@ def draw(img, corners, imagepoints):
     """
     corners = corners.astype(int)
     origin = corners[0].reshape(2)  # Flattening the array
-    imagepoints = imagepoints.astype(int).reshape(3, 2)
+    imagepoints = imagepoints.astype(int).reshape(-1, 2)
+    colour = (0, 165, 255)  # Orange
 
-    img = cv2.line(img, origin, imagepoints[0], (255, 0, 0), 5)
-    img = cv2.line(img, origin, imagepoints[1], (0, 255, 0), 5)
-    img = cv2.line(img, origin, imagepoints[2], (0, 0, 255), 5)
+    # Draw a cube at the origin
+    for start, end in zip(range(4), range(4, 8)):
+        # Draw the lines between the corners
+        img = cv2.line(img, imagepoints[start], imagepoints[end], colour, 3)
+
+    img = cv2.drawContours(img, [imagepoints[4:]], -1, colour, 3)  # Top face
+    img = cv2.drawContours(img, [imagepoints[:4]], -1, colour, 3)  # Bottom face
+
+    # Draw the three main axis
+    img = cv2.line(img, origin, imagepoints[3], (255, 0, 0), 10)  # Draw x axis in blue
+    img = cv2.line(img, origin, imagepoints[1], (0, 255, 0), 10)  # Draw y axis in green
+    img = cv2.line(img, origin, imagepoints[4], (0, 0, 255), 10)  # Draw z axis in red
+
+    # Draw big circle at origin
+    img = cv2.circle(img, tuple(origin), 15, colour, -1)
+
+    # Draw black circles at imagepoints
+    for start in imagepoints:
+        img = cv2.circle(img, tuple(start), 5, (0, 0, 0), -1)
+
     return img
 
 
 if __name__ == "__main__":
     # Set the file paths
     fp_input_image = "./images/test/01.jpg"  # Set the path to the test image
-    fp_output = "./images/image_run1.png"  # Set the path to save the test image, with axis
+    fp_output = "./images/cube/image_run1.png"  # Set the path to save the test image, with axis
     fp_params = "./data/camera_params_run1.pickle"  # Set the path to load the camera parameters
 
     # Additional parameters
@@ -53,9 +71,14 @@ if __name__ == "__main__":
     objp *= square_size  # Multiply by square size to get the real world coordinates, in milimeters
 
     n = square_size * 3  # length of the axis in mm
-    axis = np.float32([[n, 0, 0],
+    axis = np.float32([[0, 0, 0],
                        [0, n, 0],
-                       [0, 0, -n]]).reshape(-1, 3)
+                       [n, n, 0],
+                       [n, 0, 0],
+                       [0, 0, -n],
+                       [0, n, -n],
+                       [n, n, -n],
+                       [n, 0, -n]])
 
     pattern_found, corners = cv2.findChessboardCorners(img_grey, (horizontal_corners, vertical_corners), None)
     if pattern_found:
