@@ -139,8 +139,6 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
 
     Based on https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
     """
-    objp = make_object_points(horizontal_corners, vertical_corners, square_size)  # 3D points in real world space
-
     # Array to store image points from all the images
     imgpoints = []  # 2D points in image plane
 
@@ -184,6 +182,7 @@ def calibrate_camera(fp_folder: str, horizontal_corners: int, vertical_corners: 
     cv2.destroyAllWindows()
 
     # Since all images are taken with the same camera, the object points are the same
+    objp = make_object_points(horizontal_corners, vertical_corners, square_size)  # 3D points in real world space
     objpoints = len(imgpoints) * [objp]  # 3D point in real world space
 
     # Return value, camera matrix, distortion coefficients, rotation and translation vectors
